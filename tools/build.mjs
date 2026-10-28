@@ -1,6 +1,6 @@
-// Builds one landing page per region from data/regions.json.
+// Builds one landing page per Scottish region from data/regions.json + data/materials.json.
 //   node tools/build.mjs
-// Re-run after editing regions.json (new region, new wording, new domain), then commit.
+// Re-run after editing either JSON file (new region, new wording, new domain), then commit.
 // Jobs, photos and reviews are NOT baked in: they load live from Supabase, so adding a job
 // never needs a rebuild.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -8,13 +8,16 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const { site, regions } = JSON.parse(readFileSync(join(root, 'data/regions.json'), 'utf8'));
+const { site, regions, redirects = {} } = JSON.parse(readFileSync(join(root, 'data/regions.json'), 'utf8'));
+const MATERIALS = JSON.parse(readFileSync(join(root, 'data/materials.json'), 'utf8'));
 const C = {
   phone: '01592 654386', tel: '+441592654386', email: 'sales@granitesystems.co.uk',
   street: 'Unit 6 Randolph Court, Randolph Industrial Estate', town: 'Kirkcaldy', county: 'Fife', postcode: 'KY1 2YY',
   youtube: 'YFNAMImGvX0',
 };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+// H1 wording where the full region name is too long for a headline.
+const H1NAME = { central: 'Stirling & Falkirk', highlands: 'Inverness & the Highlands', glasgow: 'Glasgow', ayrshire: 'Ayrshire' };
 
 const ICON = {
   phone: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg>',
@@ -26,19 +29,55 @@ const ICON = {
   check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>',
 };
 
+function materialCard(m, up) {
+  return `<button class="mat-card" type="button" data-open-mat="${m.key}" aria-haspopup="dialog">
+            <img src="${up}${m.card}" alt="" loading="lazy" width="1600" height="800">
+            <span class="mat-body">
+              <span class="mat-kind">${esc(m.kind)}</span>
+              <span class="mat-name">${esc(m.name)}</span>
+              <span class="mat-line">${esc(m.line)}</span>
+              <span class="mat-more">Colours &amp; examples →</span>
+            </span>
+          </button>`;
+}
+
+function materialDialog(m, up) {
+  return `<dialog class="mat-dialog" id="mat-${m.key}" aria-labelledby="mat-${m.key}-title">
+    <div class="md-inner">
+      <button class="md-close" type="button" data-close aria-label="Close">×</button>
+      <div class="md-head" style="background-image:url('${up}${m.texture}')">
+        <p class="eyebrow">${esc(m.kind)}</p>
+        <h2 id="mat-${m.key}-title">${esc(m.name)}</h2>
+      </div>
+      <div class="md-body">
+        <p>${esc(m.desc)}</p>
+        <ul class="md-facts">${m.facts.map((f) => `<li>${ICON.check}${esc(f)}</li>`).join('')}</ul>
+        <h3>Popular colours</h3>
+        <ul class="swatches">${m.swatches.map(([n, f]) => `<li><img src="${up}img/materials/${f}.jpg" alt="${esc(m.name)} ${esc(n)}" loading="lazy" width="480" height="320"><span>${esc(n)}</span></li>`).join('')}</ul>
+        <p class="muted small">A selection of the range. Ask us about any colour you've seen elsewhere.</p>
+        <h3>Examples</h3>
+        <div class="md-jobs" data-mat-jobs="${m.key}"></div>
+        <div class="md-inspo" data-mat-inspo="${m.key}">
+          ${m.inspiration.map((src) => `<img src="${up}${src}" alt="${esc(m.name)} worktop" loading="lazy" width="1600" height="800">`).join('')}
+          <p class="muted small">Inspiration images. Photos of our own ${esc(m.name)} jobs will appear here as they're added.</p>
+        </div>
+        <a class="btn" href="#quote" data-quote-mat="${m.key}">Get a price in ${esc(m.name)}</a>
+      </div>
+    </div>
+  </dialog>`;
+}
+
 function page(r) {
   const up = r.path ? '../'.repeat(r.path.split('/').filter(Boolean).length) : '';
   const url = site.url + r.path;
-  const others = regions.filter((x) => x.slug !== r.slug);
+  const h1 = `Granite &amp; Quartz Worktops in ${esc(H1NAME[r.slug] || r.name)}`;
+  const lede = `Kitchen worktops, islands, vanity tops and bar tops for homes and businesses in ${r.towns.slice(0, 3).map(esc).join(', ')} and the rest of ${esc(r.name)}.`;
   const ld = {
     '@context': 'https://schema.org',
     '@type': 'HomeAndConstructionBusiness',
-    name: 'Granite Systems Ltd',
-    url,
-    image: site.url + 'img/' + r.hero,
-    logo: site.url + 'img/logo.svg',
-    telephone: C.tel,
-    email: C.email,
+    name: 'Granite Systems Ltd', url,
+    image: site.url + r.hero, logo: site.url + 'img/logo.svg',
+    telephone: C.tel, email: C.email,
     address: { '@type': 'PostalAddress', streetAddress: C.street, addressLocality: C.town, addressRegion: C.county, postalCode: C.postcode, addressCountry: 'GB' },
     areaServed: r.towns.map((t) => ({ '@type': 'City', name: t })),
     sameAs: ['https://www.facebook.com/granitesystems/', 'https://www.instagram.com/granitesystems/', 'https://www.youtube.com/channel/UCbbdjDJXxDYwZLXULOBAnxA'],
@@ -56,14 +95,14 @@ function page(r) {
   <meta property="og:type" content="website">
   <meta property="og:title" content="${esc(r.title)}">
   <meta property="og:description" content="${esc(r.description)}">
-  <meta property="og:image" content="${site.url}img/${r.hero}">
+  <meta property="og:image" content="${site.url}${r.hero}">
   <meta property="og:url" content="${url}">
   <meta name="theme-color" content="#1e2843">
   <link rel="icon" href="${up}img/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;700&display=swap">
-  <link rel="preload" as="image" href="${up}img/${r.hero}">
+  <link rel="preload" as="image" href="${up}${r.hero}">
   <link rel="stylesheet" href="${up}css/style.css">
   <script type="application/ld+json">${JSON.stringify(ld)}</script>
 </head>
@@ -73,8 +112,9 @@ function page(r) {
     <div class="wrap">
       <a class="brand" href="${up || './'}" aria-label="Granite Systems home"><img src="${up}img/logo.svg" alt="Granite Systems" width="182" height="26"></a>
       <nav class="top-nav" aria-label="Page">
-        <a href="#work">Our work</a>
-        <a href="#video">Watch</a>
+        <a href="#materials">Materials</a>
+        <a href="#work" data-work-link hidden>Our work</a>
+        <a href="#how">How it works</a>
         <a href="#reviews">Reviews</a>
         <a href="#areas">Areas</a>
       </nav>
@@ -86,20 +126,15 @@ function page(r) {
   </header>
 
   <main>
-    <section class="hero" style="background-image:url('${up}img/${r.hero}')">
+    <section class="hero" style="background-image:url('${up}${r.hero}')">
       <div class="wrap hero-grid">
         <div class="hero-copy">
-          <p class="eyebrow">Granite Systems · ${esc(r.name)}</p>
-          <h1>${esc(r.h1)}</h1>
-          <p class="lede">${esc(r.lede)}</p>
-          <ul class="ticks">
-            <li>${ICON.check}Digital templating: no mess, accurate fit</li>
-            <li>${ICON.check}Cut on CNC, finished by hand in Kirkcaldy</li>
-            <li>${ICON.check}Fitted by our own team, start to finish</li>
-          </ul>
+          <p class="eyebrow">Made in Fife · Fitted across Scotland</p>
+          <h1>${h1}</h1>
+          <p class="lede">${lede}</p>
           <div class="hero-actions">
             <a class="btn light" href="tel:${C.tel}">${ICON.phone}Call ${C.phone}</a>
-            <a class="btn ghost-light" href="#work">See recent jobs</a>
+            <a class="btn ghost-light" href="#materials">Browse materials</a>
           </div>
         </div>
 
@@ -112,12 +147,17 @@ function page(r) {
             <div class="field"><label for="q-postcode">Postcode</label><input id="q-postcode" name="postcode" autocomplete="postal-code" required></div>
           </div>
           <div class="field"><label for="q-email">Email</label><input id="q-email" name="email" type="email" autocomplete="email" required></div>
-          <div class="field"><label for="q-type">What's it for?</label>
-            <select id="q-type" name="project_type">
-              <option>Kitchen worktops</option><option>Bathroom / vanity</option><option>Bar or commercial</option><option>Table, hearth or other piece</option><option>Not sure yet</option>
-            </select>
+          <div class="row2">
+            <div class="field"><label for="q-type">What's it for?</label>
+              <select id="q-type" name="project_type">
+                <option>Kitchen worktops</option><option>Bathroom / vanity</option><option>Bar or commercial</option><option>Table, hearth or other</option><option>Not sure yet</option>
+              </select>
+            </div>
+            <div class="field"><label for="q-mat">Material</label>
+              <select id="q-mat" name="material"><option value="">Not sure yet</option>${MATERIALS.map((m) => `<option value="${m.key}">${esc(m.name)}</option>`).join('')}</select>
+            </div>
           </div>
-          <div class="field"><label for="q-msg">Anything else? <span class="opt">(optional)</span></label><textarea id="q-msg" name="message" rows="3" placeholder="Rough sizes, material you like, when the kitchen goes in…"></textarea></div>
+          <div class="field"><label for="q-msg">Anything else? <span class="opt">(optional)</span></label><textarea id="q-msg" name="message" rows="3" placeholder="Rough sizes, colour you like, when the kitchen goes in…"></textarea></div>
           <div class="hp" aria-hidden="true"><label>Leave blank <input name="company" tabindex="-1" autocomplete="off"></label></div>
           <button class="btn block" type="submit">Request my quote</button>
           <p class="fine">By sending this you agree we can contact you about your enquiry. <a href="${up}privacy.html">Privacy</a></p>
@@ -126,32 +166,49 @@ function page(r) {
       </div>
     </section>
 
-    <section class="strip" aria-label="Why Granite Systems">
+    <section class="strip" aria-label="About Granite Systems">
       <div class="wrap strip-grid">
-        <div><strong>~60 years</strong><span>in the stone trade</span></div>
-        <div><strong>Template → fit</strong><span>one team, start to finish</span></div>
-        <div><strong>CNC + hand finish</strong><span>in our Kirkcaldy factory</span></div>
-        <div><strong>Homes &amp; commercial</strong><span>one worktop to whole hotels</span></div>
+        <div><strong>Almost 60 years in stone</strong><span>Family roots in J. G. Brown &amp; Son</span></div>
+        <div><strong>Trusted by kitchen studios</strong><span>across Scotland</span></div>
+        <div><strong>Commercial UK-wide</strong><span>Hotels, bars and restaurants</span></div>
+        <div><strong>One piece or hundreds</strong><span>A single worktop to a full hotel refit</span></div>
       </div>
     </section>
 
-    <section id="work">
+    <section id="work" hidden>
       <div class="wrap">
         <div class="section-head">
           <p class="eyebrow">Recent jobs</p>
-          <h2>Our work in ${esc(r.short)}</h2>
-          <p>Photos from jobs we've templated, made and fitted, with what the customer said about it.</p>
+          <h2 data-work-title>Recent jobs</h2>
+          <p data-work-sub></p>
         </div>
         <div class="jobs" id="jobs" aria-live="polite"></div>
-        <div class="more-head" id="more-head" hidden><h3>More of our work</h3></div>
+        <div class="more-head" id="more-head" hidden><h3>Elsewhere in Scotland</h3></div>
         <div class="jobs" id="jobs-more"></div>
-        <div class="showcase" id="showcase">
-          <figure><img src="${up}img/kitchen-white-marble.jpg" alt="White marble-effect island with waterfall end" loading="lazy" width="1600" height="800"><figcaption>Kitchen islands</figcaption></figure>
-          <figure><img src="${up}img/granite-black-kitchen.jpg" alt="Black granite worktop with gas hob" loading="lazy" width="1600" height="800"><figcaption>Granite worktops</figcaption></figure>
-          <figure><img src="${up}img/marble-black-vanity.jpg" alt="Black marble double vanity with undermount basins" loading="lazy" width="1600" height="800"><figcaption>Bathroom vanities</figcaption></figure>
-          <figure><img src="${up}img/commercial-restaurant.jpg" alt="Restaurant with stone-topped tables" loading="lazy" width="1600" height="800"><figcaption>Bars &amp; restaurants</figcaption></figure>
-          <figure><img src="${up}img/corian-grey-kitchen.jpg" alt="Grey Corian worktop with curved end" loading="lazy" width="1600" height="800"><figcaption>Corian</figcaption></figure>
-          <figure><img src="${up}img/kitchen-grey-hob.jpg" alt="Grey quartz worktop with hob and sink" loading="lazy" width="1600" height="800"><figcaption>Quartz worktops</figcaption></figure>
+      </div>
+    </section>
+
+    <section id="materials" class="alt">
+      <div class="wrap">
+        <div class="section-head">
+          <p class="eyebrow">Materials</p>
+          <h2>Choose your surface</h2>
+          <p>Tap a material to see its colours, how it wears and examples of finished worktops.</p>
+        </div>
+        <div class="mat-grid">
+          ${MATERIALS.map((m) => materialCard(m, up)).join('\n          ')}
+        </div>
+      </div>
+    </section>
+
+    <section id="make">
+      <div class="wrap">
+        <div class="section-head"><p class="eyebrow">What we make</p><h2>Anything in sheet stone</h2></div>
+        <div class="tiles">
+          <article class="tile"><img src="${up}img/kitchen-island-grey.jpg" alt="" loading="lazy" width="1600" height="800"><h3>Kitchens</h3><p>Worktops, islands, waterfall ends, upstands, splashbacks and sink cut-outs.</p></article>
+          <article class="tile"><img src="${up}img/bathroom-basin.jpg" alt="" loading="lazy" width="1600" height="800"><h3>Bathrooms</h3><p>Vanity tops, wall cladding and shower enclosures.</p></article>
+          <article class="tile"><img src="${up}img/commercial-tearoom.jpg" alt="" loading="lazy" width="1600" height="800"><h3>Commercial</h3><p>Bar tops, reception desks, table tops and hotel vanities.</p></article>
+          <article class="tile"><img src="${up}img/commercial-restaurant.jpg" alt="" loading="lazy" width="1600" height="800"><h3>Tables &amp; hearths</h3><p>Dining and coffee tables, hearths and thresholds, often from offcuts.</p></article>
         </div>
       </div>
     </section>
@@ -160,8 +217,8 @@ function page(r) {
       <div class="wrap video-grid">
         <div class="video-copy">
           <p class="eyebrow">Watch</p>
-          <h2>See a worktop go in</h2>
-          <p>A Corian worktop fitted on a Howdens kitchen by our team. Every job is measured digitally, cut on our CNC machines and finished by hand before it leaves the factory.</p>
+          <h2>A Corian worktop on a Howdens kitchen</h2>
+          <p>One of our fits, filmed from start to finish.</p>
           <a class="btn light" href="#quote">Get a quote</a>
         </div>
         <div class="video">
@@ -170,46 +227,25 @@ function page(r) {
       </div>
     </section>
 
-    <section id="make">
-      <div class="wrap">
-        <div class="section-head">
-          <p class="eyebrow">What we make</p>
-          <h2>Anything in sheet stone</h2>
-        </div>
-        <div class="tiles">
-          <article class="tile"><img src="${up}img/kitchen-island-grey.jpg" alt="" loading="lazy" width="1600" height="800"><h3>Kitchen worktops</h3><p>Islands, waterfall ends, upstands, splashbacks, undermount and drainer grooves.</p></article>
-          <article class="tile"><img src="${up}img/bathroom-basin.jpg" alt="" loading="lazy" width="1600" height="800"><h3>Bathrooms</h3><p>Vanity tops, wall cladding and shower enclosures.</p></article>
-          <article class="tile"><img src="${up}img/commercial-tearoom.jpg" alt="" loading="lazy" width="1600" height="800"><h3>Commercial</h3><p>Bar tops, reception desks and vanity tops for hotels, from one to several hundred.</p></article>
-          <article class="tile"><img src="${up}img/marble-edge.jpg" alt="" loading="lazy" width="1600" height="800"><h3>Tables &amp; hearths</h3><p>Dining and coffee tables, hearths and thresholds, often from offcuts at great prices.</p></article>
-        </div>
-        <ul class="chips" aria-label="Materials">
-          <li>Silestone</li><li>Sensa granite</li><li>Dekton</li><li>Granite</li><li>Marble</li><li>Limestone</li><li>Corian</li>
-        </ul>
-      </div>
-    </section>
-
     <section class="alt" id="how">
       <div class="wrap">
-        <div class="section-head"><p class="eyebrow">How it works</p><h2>Four steps, one team</h2></div>
+        <div class="section-head"><p class="eyebrow">How it works</p><h2>From enquiry to fitted</h2></div>
         <ol class="steps">
-          <li><span>1</span><h3>Enquire</h3><p>Send the form or call. Rough sizes or a kitchen plan are plenty for a quote.</p></li>
-          <li><span>2</span><h3>Digital template</h3><p>Once your units are in, we measure on site digitally. No board templates, no mess.</p></li>
-          <li><span>3</span><h3>Made in Kirkcaldy</h3><p>Cut on our computerised machinery, then hand finished by skilled stonemasons.</p></li>
-          <li><span>4</span><h3>Fitted</h3><p>Our own fitters install it, cut-outs and all, and leave it clean.</p></li>
+          <li><span>1</span><h3>Enquire</h3><p>Use the form or call ${C.phone}. We'll talk through material, edges and cut-outs and send a price.</p></li>
+          <li><span>2</span><h3>Template</h3><p>Once your units are in, we measure on site with a digital templating system: no board templates, no mess.</p></li>
+          <li><span>3</span><h3>Make</h3><p>Your worktops are cut on computerised machinery in our Kirkcaldy workshop, then finished by hand.</p></li>
+          <li><span>4</span><h3>Fit</h3><p>Our own fitters install them, cut-outs and all.</p></li>
         </ol>
         <div class="factory">
-          <img src="${up}img/factory-floor.jpg" alt="The Granite Systems factory floor" loading="lazy" width="1600" height="800">
-          <img src="${up}img/craft-polishing.jpg" alt="Stonemason hand finishing a worktop edge" loading="lazy" width="1600" height="800">
+          <img src="${up}img/factory-floor.jpg" alt="The Granite Systems workshop" loading="lazy" width="1600" height="800">
+          <img src="${up}img/craft-polishing.jpg" alt="A stonemason hand finishing a worktop edge" loading="lazy" width="1600" height="800">
         </div>
       </div>
     </section>
 
     <section id="reviews">
       <div class="wrap">
-        <div class="section-head">
-          <p class="eyebrow">Reviews</p>
-          <h2>What customers say</h2>
-        </div>
+        <div class="section-head"><p class="eyebrow">Reviews</p><h2>What customers say</h2></div>
         <div class="reviews" id="review-list">
           <blockquote class="review"><p>“Thanks for the continued help and the professional manner that your team carried out their work. Please pass on our regards to all your staff involved, for the beautiful end result they produced. Well done.”</p><cite>Forgan Smithy House, Newport-on-Tay</cite></blockquote>
           <blockquote class="review"><p>“We are very pleased with your service. Worktop arrived and fitted without delays. After discovering a mark on the worktop, this was dealt with efficiently and we are very satisfied. We will recommend your company to relatives and friends.”</p><cite>Mr &amp; Mrs Grant</cite></blockquote>
@@ -220,25 +256,28 @@ function page(r) {
     </section>
 
     <section class="alt" id="areas">
-      <div class="wrap areas">
-        <div>
-          <p class="eyebrow">Areas we cover</p>
-          <h2>${esc(r.name)}</h2>
-          <p>${esc(r.local)}</p>
-          <ul class="towns">${r.towns.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
-        </div>
-        <div class="card other-areas">
-          <h3>Also covering</h3>
-          <ul>${others.map((o) => `<li><a href="${up}${o.path}">${esc(o.name)}</a></li>`).join('')}</ul>
-          <p class="muted">Commercial projects anywhere in the UK.</p>
+      <div class="wrap">
+        <div class="areas">
+          <div>
+            <p class="eyebrow">Areas we cover</p>
+            <h2>${esc(r.name.charAt(0).toUpperCase() + r.name.slice(1))}</h2>
+            <p>${esc(r.local)}</p>
+            <ul class="towns">${r.towns.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
+          </div>
+          <nav class="card all-areas" aria-label="All areas">
+            <h3>All areas</h3>
+            <ul>${regions.map((o) => o.slug === r.slug
+              ? `<li><span aria-current="page">${esc(o.name.charAt(0).toUpperCase() + o.name.slice(1))}</span></li>`
+              : `<li><a href="${up}${o.path}">${esc(o.name.charAt(0).toUpperCase() + o.name.slice(1))}</a></li>`).join('')}</ul>
+          </nav>
         </div>
       </div>
     </section>
 
     <section class="cta-band">
       <div class="wrap">
-        <h2>Ready to price your worktops?</h2>
-        <p>Rough measurements are fine. We'll take it from there.</p>
+        <h2>Ready for a price?</h2>
+        <p>Rough measurements or a kitchen plan are enough to get started.</p>
         <div class="hero-actions center">
           <a class="btn light" href="#quote">Get a free quote</a>
           <a class="btn ghost-light" href="tel:${C.tel}">${ICON.phone}${C.phone}</a>
@@ -254,17 +293,12 @@ function page(r) {
         <p>Granite Systems Ltd<br>${C.street}<br>${C.town}, ${C.county} ${C.postcode}</p>
       </div>
       <div>
-        <h3>Contact</h3>
         <p><a href="tel:${C.tel}">${ICON.phone}${C.phone}</a><br><a href="mailto:${C.email}">${ICON.mail}${C.email}</a></p>
         <p class="social">
           <a href="https://www.instagram.com/granitesystems/" aria-label="Instagram" rel="noopener" target="_blank">${ICON.ig}</a>
           <a href="https://www.facebook.com/granitesystems/" aria-label="Facebook" rel="noopener" target="_blank">${ICON.fb}</a>
           <a href="https://www.youtube.com/channel/UCbbdjDJXxDYwZLXULOBAnxA" aria-label="YouTube" rel="noopener" target="_blank">${ICON.yt}</a>
         </p>
-      </div>
-      <div>
-        <h3>Areas</h3>
-        <ul>${regions.map((o) => `<li><a href="${up}${o.path}">${esc(o.name)}</a></li>`).join('')}</ul>
       </div>
     </div>
     <div class="wrap foot-base"><span>© <span data-year></span> Granite Systems Ltd</span><a href="${up}privacy.html">Privacy</a><a href="${up}admin.html" rel="nofollow">Staff</a></div>
@@ -274,6 +308,8 @@ function page(r) {
     <a href="tel:${C.tel}">${ICON.phone}Call</a>
     <a href="#quote" class="primary">Free quote</a>
   </div>
+
+  ${MATERIALS.map((m) => materialDialog(m, up)).join('\n  ')}
 
   <dialog class="lightbox" id="lightbox">
     <button class="lb-close" type="button" aria-label="Close">×</button>
@@ -293,8 +329,20 @@ for (const r of regions) {
   const out = join(root, r.path, 'index.html');
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, page(r));
-  console.log('wrote', r.path + 'index.html');
 }
+console.log(`wrote ${regions.length} region pages`);
+
+// Old addresses → new ones
+for (const [from, to] of Object.entries(redirects)) {
+  const out = join(root, from, 'index.html');
+  mkdirSync(dirname(out), { recursive: true });
+  const depth = from.split('/').filter(Boolean).length;
+  const rel = '../'.repeat(depth) + to;
+  writeFileSync(out, `<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex"><link rel="canonical" href="${site.url}${to}"><meta http-equiv="refresh" content="0; url=${rel}"><title>Moved</title><a href="${rel}">This page has moved</a>\n`);
+}
+
+// Region list for the staff page + site (single source of truth)
+writeFileSync(join(root, 'js/regions.js'), `// Generated by tools/build.mjs from data/regions.json. Don't edit by hand.\nexport const REGIONS = ${JSON.stringify(Object.fromEntries([...regions.map((r) => [r.slug, r.name.charAt(0).toUpperCase() + r.name.slice(1)]), ['elsewhere', 'Elsewhere in the UK']]), null, 2)};\nexport const TOWNS = ${JSON.stringify(Object.fromEntries(regions.map((r) => [r.slug, r.towns])))};\nexport const MATERIALS = ${JSON.stringify(MATERIALS.map(({ key, name, keywords }) => ({ key, name, keywords })))};\n`);
 
 // sitemap + robots
 const today = new Date().toISOString().slice(0, 10);
@@ -306,4 +354,4 @@ ${regions.map((r) => `  <url><loc>${site.url}${r.path}</loc><lastmod>${today}</l
 writeFileSync(join(root, 'robots.txt'), site.noindex
   ? 'User-agent: *\nDisallow: /admin.html\n'
   : `User-agent: *\nDisallow: /admin.html\nSitemap: ${site.url}sitemap.xml\n`);
-console.log('wrote sitemap.xml, robots.txt');
+console.log('wrote js/regions.js, sitemap.xml, robots.txt');
