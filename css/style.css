@@ -243,6 +243,8 @@ section.dark .eyebrow { color: rgba(255,255,255,.6); }
 .add-photos { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
 .add-photos label { cursor: pointer; }
 .add-photos input { display: none; }
+.add-photos .btn { color: #fff; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+.add-photos .btn.ghost { color: var(--charcoal); }
 .rating { display: flex; gap: 4px; }
 .rating button { background: none; border: 0; font-size: 30px; color: var(--line); cursor: pointer; padding: 0 2px; }
 .rating button.on { color: var(--gold); }
