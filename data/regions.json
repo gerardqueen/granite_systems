@@ -1,0 +1,104 @@
+{
+  "site": {
+    "url": "https://gerardqueen.github.io/granite_systems/",
+    "noindex": true,
+    "name": "Granite Systems"
+  },
+  "regions": [
+    {
+      "slug": "fife",
+      "path": "",
+      "name": "Fife",
+      "short": "Fife",
+      "title": "Granite & Quartz Worktops in Fife | Granite Systems, Kirkcaldy",
+      "description": "Granite, quartz, Dekton and marble worktops made in our Kirkcaldy factory and fitted across Fife by our own team. Free quotes.",
+      "h1": "Stone worktops, made and fitted in Fife",
+      "lede": "Granite, quartz, Dekton, marble and Corian, templated digitally, cut in our Kirkcaldy factory and fitted by our own team.",
+      "towns": [
+        "Kirkcaldy",
+        "Dunfermline",
+        "Glenrothes",
+        "St Andrews",
+        "Cupar",
+        "Leven",
+        "Burntisland",
+        "Newport-on-Tay"
+      ],
+      "local": "Our factory is on the Randolph Industrial Estate in Kirkcaldy, so for Fife customers we're never far away. You're welcome to come in and see the materials, and the team who cut your worktop are the same people who template and fit it. If you're nearby, ask about our offcuts too: they're ideal for hearths, tabletops and smaller pieces.",
+      "hero": "hero-marble-island.jpg"
+    },
+    {
+      "slug": "edinburgh",
+      "path": "edinburgh/",
+      "name": "Edinburgh & the Lothians",
+      "short": "Edinburgh",
+      "title": "Granite & Quartz Worktops Edinburgh & Lothians | Granite Systems",
+      "description": "Bespoke granite, quartz and Dekton worktops for Edinburgh, Midlothian, East and West Lothian. Templated, made and fitted by our own team.",
+      "h1": "Stone worktops for Edinburgh & the Lothians",
+      "lede": "Kitchen worktops, vanities and bar tops in granite, quartz and Dekton, made in our Fife factory and fitted across Edinburgh and the Lothians.",
+      "towns": [
+        "Edinburgh",
+        "Leith",
+        "Musselburgh",
+        "Dalkeith",
+        "Livingston",
+        "Linlithgow",
+        "South Queensferry",
+        "Haddington",
+        "North Berwick"
+      ],
+      "local": "We're just over the Queensferry Crossing in Kirkcaldy, so Edinburgh and the Lothians are well within reach of our templating and fitting teams. We work with homeowners directly and with kitchen studios and builders, from city flats to new builds. Every worktop is measured digitally on site, so there's no mess, no board templates and an accurate fit.",
+      "hero": "kitchen-island-grey.jpg"
+    },
+    {
+      "slug": "tayside",
+      "path": "dundee-perth/",
+      "name": "Dundee, Perth & Tayside",
+      "short": "Dundee & Perth",
+      "title": "Granite & Quartz Worktops Dundee & Perth | Granite Systems",
+      "description": "Granite, quartz, Dekton and marble worktops for Dundee, Perth, Angus and Perthshire, made in our Fife factory and fitted by our own team.",
+      "h1": "Stone worktops for Dundee, Perth & Tayside",
+      "lede": "Granite, quartz and Dekton worktops for kitchens, bathrooms and bars in Dundee, Perth, Angus and Perthshire, made in Fife and fitted by our own team.",
+      "towns": [
+        "Dundee",
+        "Broughty Ferry",
+        "Perth",
+        "Arbroath",
+        "Carnoustie",
+        "Forfar",
+        "Blairgowrie",
+        "Crieff"
+      ],
+      "local": "From Kirkcaldy it's a straight run up the M90 to Perth or over the Tay to Dundee. Whether it's a family kitchen in Broughty Ferry, a farmhouse in Perthshire or a hotel bar in Angus, we handle the whole job (measuring, manufacture and fitting) with one point of contact from start to finish.",
+      "hero": "kitchen-white-sink.jpg"
+    },
+    {
+      "slug": "central",
+      "path": "stirling-falkirk/",
+      "name": "Stirling, Falkirk & Central Scotland",
+      "short": "Stirling & Falkirk",
+      "title": "Granite & Quartz Worktops Stirling & Falkirk | Granite Systems",
+      "description": "Bespoke stone worktops for Stirling, Falkirk, Clackmannanshire and Central Scotland. Granite, quartz and Dekton, templated, made and fitted.",
+      "h1": "Stone worktops for Stirling, Falkirk & Central Scotland",
+      "lede": "Granite, quartz and Dekton worktops for Stirling, Falkirk and Clackmannanshire, made in our Fife factory and fitted by our own team.",
+      "towns": [
+        "Stirling",
+        "Falkirk",
+        "Alloa",
+        "Bridge of Allan",
+        "Dunblane",
+        "Larbert",
+        "Grangemouth",
+        "Bo'ness"
+      ],
+      "local": "Central Scotland is on our doorstep via the Kincardine and Clackmannanshire bridges. We template, make and fit for homeowners, kitchen showrooms and developers across Stirling, Falkirk and Clackmannanshire, and we're as happy cutting a single vanity top as fitting out a full development.",
+      "hero": "kitchen-island-dark.jpg"
+    }
+  ],
+  "adminOnlyRegions": [
+    {
+      "slug": "elsewhere",
+      "name": "Elsewhere in the UK"
+    }
+  ]
+}
