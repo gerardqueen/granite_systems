@@ -1,23 +1,77 @@
-// Builds one landing page per Scottish region from data/regions.json + data/materials.json.
+// Builds the Scotland hub page (/) and one page per region from data/regions.json + data/materials.json.
 //   node tools/build.mjs
-// Re-run after editing either JSON file (new region, new wording, new domain), then commit.
-// Jobs, photos and reviews are NOT baked in: they load live from Supabase, so adding a job
-// never needs a rebuild.
+// Runs automatically on GitHub (see .github/workflows/build-pages.yml): whenever the data files
+// change, and every couple of hours to pick up newly added jobs.
+//
+// A region page only goes "live" (indexable, in the Areas menu and sitemap) once it has at least
+// site.activateAt published jobs. Until then it still exists (handy for ads or links) but is
+// noindex and not linked, so Google never sees thin, near-identical "doorway" pages. Live pages
+// get their jobs written into the HTML, so search engines see real local content.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const { site, regions, redirects = {} } = JSON.parse(readFileSync(join(root, 'data/regions.json'), 'utf8'));
+const { site, hub: HUB, regions, redirects = {} } = JSON.parse(readFileSync(join(root, 'data/regions.json'), 'utf8'));
 const MATERIALS = JSON.parse(readFileSync(join(root, 'data/materials.json'), 'utf8'));
 const C = {
   phone: '01592 654386', tel: '+441592654386', email: 'sales@granitesystems.co.uk',
   street: 'Unit 6 Randolph Court, Randolph Industrial Estate', town: 'Kirkcaldy', county: 'Fife', postcode: 'KY1 2YY',
   youtube: 'YFNAMImGvX0',
 };
-const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 // H1 wording where the full region name is too long for a headline.
 const H1NAME = { central: 'Stirling & Falkirk', highlands: 'Inverness & the Highlands', glasgow: 'Glasgow', ayrshire: 'Ayrshire' };
+
+// ---------- Published jobs from Supabase ----------
+const cfg = readFileSync(join(root, 'js/config.js'), 'utf8');
+const SB_URL = cfg.match(/SUPABASE_URL = '([^']+)'/)[1];
+const SB_KEY = cfg.match(/SUPABASE_ANON_KEY = '([^']+)'/)[1];
+let JOBS = [];
+if (process.env.MOCK_JOBS) JOBS = JSON.parse(readFileSync(process.env.MOCK_JOBS, 'utf8')); // local preview only
+else try {
+  const r = await fetch(`${SB_URL}/rest/v1/gs_jobs?select=*&published=is.true&order=featured.desc,job_date.desc.nullslast,created_at.desc&limit=500`,
+    { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } });
+  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+  JOBS = (await r.json()).filter((j) => j.photos?.length);
+} catch (e) {
+  // On GitHub a failed fetch must stop the build, or every region would be switched off.
+  if (process.env.CI) { console.error('Could not load jobs:', e.message); process.exit(1); }
+  console.warn('Jobs not loaded (offline?) — building as if there are none:', e.message);
+}
+const COUNTS = Object.fromEntries(regions.map((r) => [r.slug, JOBS.filter((j) => j.region === r.slug).length]));
+const activateAt = site.activateAt ?? 1;
+const isLive = (r) => r.slug === 'scotland' || COUNTS[r.slug] >= activateAt;
+const LIVE = regions.filter(isLive);
+const REGION_NAME = Object.fromEntries(regions.map((r) => [r.slug, cap(r.name)]));
+
+const jobTitle = (j) => j.title || [j.material, (j.job_type || 'worktops').toLowerCase()].filter(Boolean).join(' ');
+function workFor(slug) {
+  if (!JOBS.length) return { main: [], more: [], title: 'Recent jobs', sub: '' };
+  if (slug === 'scotland') return { main: JOBS.slice(0, 9), more: [], title: 'Recent jobs across Scotland', sub: 'Worktops we\'ve templated, made and fitted, with what the customer said about them.' };
+  const here = JOBS.filter((j) => j.region === slug);
+  const others = JOBS.filter((j) => j.region !== slug);
+  const name = REGION_NAME[slug].replace(/^The /, 'the ');
+  if (!here.length) return { main: others.slice(0, 6), more: [], title: 'Recent jobs across Scotland', sub: `No ${name} jobs on here yet, so here's some of our recent work elsewhere.` };
+  return { main: here, more: here.length < 3 ? others.slice(0, 6 - here.length) : [], title: `Recent jobs in ${name}`, sub: 'Worktops we\'ve templated, made and fitted nearby, with what the customer said about them.' };
+}
+const stars = (n) => (n ? '★'.repeat(n) + '☆'.repeat(5 - n) : '');
+function jobCard(j) {
+  const n = j.photos.length;
+  return `<article class="job">
+    <button class="job-photo" type="button" data-job="${esc(j.id)}" aria-label="View ${n} photo${n > 1 ? 's' : ''}: ${esc(jobTitle(j))}">
+      <img src="${esc(j.photos[0])}" alt="${esc(jobTitle(j))}${j.town ? ' in ' + esc(j.town) : ''}" loading="lazy">
+      ${n > 1 ? `<span class="count">${n} photos</span>` : ''}
+    </button>
+    <div class="job-body">
+      <div class="job-meta">${esc([j.town, REGION_NAME[j.region]].filter(Boolean).join(', '))}${j.material ? ' · ' + esc(j.material) : ''}</div>
+      <h3>${esc(jobTitle(j))}</h3>
+      ${j.description ? `<p>${esc(j.description)}</p>` : ''}
+      ${j.review_text ? `<blockquote class="quote-line">${j.rating ? `<span class="stars" aria-label="${j.rating} out of 5">${stars(j.rating)}</span><br>` : ''}“${esc(j.review_text)}”${j.reviewer_name ? `<cite>${esc(j.reviewer_name)}</cite>` : ''}</blockquote>` : ''}
+    </div>
+  </article>`;
+}
 
 const ICON = {
   phone: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg>',
@@ -70,8 +124,10 @@ function materialDialog(m, up) {
 function page(r) {
   const up = r.path ? '../'.repeat(r.path.split('/').filter(Boolean).length) : '';
   const url = site.url + r.path;
-  const h1 = `Granite &amp; Quartz Worktops in ${esc(H1NAME[r.slug] || r.name)}`;
-  const lede = `Kitchen worktops, islands, vanity tops and bar tops for homes and businesses in ${r.towns.slice(0, 3).map(esc).join(', ')} and the rest of ${esc(r.name)}.`;
+  const hub = r.slug === 'scotland';
+  const h1 = r.h1 || `Granite &amp; Quartz Worktops in ${esc(H1NAME[r.slug] || r.name)}`;
+  const lede = r.lede ? esc(r.lede) : `Kitchen worktops, islands, vanity tops and bar tops for homes and businesses in ${r.towns.slice(0, 3).map(esc).join(', ')} and the rest of ${esc(r.name)}.`;
+  const work = workFor(r.slug);
   const ld = {
     '@context': 'https://schema.org',
     '@type': 'HomeAndConstructionBusiness',
@@ -79,7 +135,7 @@ function page(r) {
     image: site.url + r.hero, logo: site.url + 'img/logo.svg',
     telephone: C.tel, email: C.email,
     address: { '@type': 'PostalAddress', streetAddress: C.street, addressLocality: C.town, addressRegion: C.county, postalCode: C.postcode, addressCountry: 'GB' },
-    areaServed: r.towns.map((t) => ({ '@type': 'City', name: t })),
+    areaServed: hub ? { '@type': 'AdministrativeArea', name: 'Scotland' } : r.towns.map((t) => ({ '@type': 'City', name: t })),
     sameAs: ['https://www.facebook.com/granitesystems/', 'https://www.instagram.com/granitesystems/', 'https://www.youtube.com/channel/UCbbdjDJXxDYwZLXULOBAnxA'],
   };
 
@@ -90,7 +146,7 @@ function page(r) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${esc(r.title)}</title>
   <meta name="description" content="${esc(r.description)}">
-  ${site.noindex ? '<meta name="robots" content="noindex">' : ''}
+  ${site.noindex || !isLive(r) ? '<meta name="robots" content="noindex">' : ''}
   <link rel="canonical" href="${url}">
   <meta property="og:type" content="website">
   <meta property="og:title" content="${esc(r.title)}">
@@ -113,10 +169,16 @@ function page(r) {
       <a class="brand" href="${up || './'}" aria-label="Granite Systems home"><img src="${up}img/logo.svg" alt="Granite Systems" width="182" height="26"></a>
       <nav class="top-nav" aria-label="Page">
         <a href="#materials">Materials</a>
-        <a href="#work" data-work-link hidden>Our work</a>
+        <a href="#work" data-work-link${work.main.length ? '' : ' hidden'}>Our work</a>
         <a href="#how">How it works</a>
         <a href="#reviews">Reviews</a>
-        <a href="#areas">Areas</a>
+        <details class="nav-areas">
+          <summary>Areas</summary>
+          <ul>
+            <li><a href="${up || './'}"${hub ? ' aria-current="page"' : ''}>All of Scotland</a></li>
+            ${LIVE.map((o) => `<li><a href="${up}${o.path}"${o.slug === r.slug ? ' aria-current="page"' : ''}>${esc(cap(o.name))}</a></li>`).join('\n            ')}
+          </ul>
+        </details>
       </nav>
       <div class="top-cta">
         <a class="top-phone" href="tel:${C.tel}">${ICON.phone}<span>${C.phone}</span></a>
@@ -175,16 +237,16 @@ function page(r) {
       </div>
     </section>
 
-    <section id="work" hidden>
+    <section id="work"${work.main.length ? '' : ' hidden'}>
       <div class="wrap">
         <div class="section-head">
           <p class="eyebrow">Recent jobs</p>
-          <h2 data-work-title>Recent jobs</h2>
-          <p data-work-sub></p>
+          <h2 data-work-title>${esc(work.title)}</h2>
+          <p data-work-sub>${esc(work.sub)}</p>
         </div>
-        <div class="jobs" id="jobs" aria-live="polite"></div>
-        <div class="more-head" id="more-head" hidden><h3>Elsewhere in Scotland</h3></div>
-        <div class="jobs" id="jobs-more"></div>
+        <div class="jobs" id="jobs" aria-live="polite">${work.main.map(jobCard).join('')}</div>
+        <div class="more-head" id="more-head"${work.more.length ? '' : ' hidden'}><h3>Elsewhere in Scotland</h3></div>
+        <div class="jobs" id="jobs-more">${work.more.map(jobCard).join('')}</div>
       </div>
     </section>
 
@@ -260,16 +322,19 @@ function page(r) {
         <div class="areas">
           <div>
             <p class="eyebrow">Areas we cover</p>
-            <h2>${esc(r.name.charAt(0).toUpperCase() + r.name.slice(1))}</h2>
+            <h2>${esc(cap(r.name))}</h2>
             <p>${esc(r.local)}</p>
-            <ul class="towns">${r.towns.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
+            ${hub ? '' : `<ul class="towns">${r.towns.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>`}
           </div>
-          <nav class="card all-areas" aria-label="All areas">
-            <h3>All areas</h3>
-            <ul>${regions.map((o) => o.slug === r.slug
-              ? `<li><span aria-current="page">${esc(o.name.charAt(0).toUpperCase() + o.name.slice(1))}</span></li>`
-              : `<li><a href="${up}${o.path}">${esc(o.name.charAt(0).toUpperCase() + o.name.slice(1))}</a></li>`).join('')}</ul>
-          </nav>
+          ${hub ? `<div class="card all-areas">
+            <h3>Across Scotland</h3>
+            <ul>${regions.map((o) => isLive(o)
+              ? `<li><a href="${o.path}">${esc(cap(o.name))}</a> <small>${COUNTS[o.slug]} job${COUNTS[o.slug] === 1 ? '' : 's'}</small></li>`
+              : `<li><span>${esc(cap(o.name))}</span></li>`).join('')}</ul>
+          </div>` : `<div class="card all-areas">
+            <h3>Elsewhere</h3>
+            <ul><li><a href="${up}">All of Scotland</a></li>${LIVE.filter((o) => o.slug !== r.slug).map((o) => `<li><a href="${up}${o.path}">${esc(cap(o.name))}</a></li>`).join('')}</ul>
+          </div>`}
         </div>
       </div>
     </section>
@@ -325,12 +390,13 @@ function page(r) {
 `;
 }
 
-for (const r of regions) {
+const all = [HUB, ...regions];
+for (const r of all) {
   const out = join(root, r.path, 'index.html');
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, page(r));
 }
-console.log(`wrote ${regions.length} region pages`);
+console.log(`wrote hub + ${regions.length} region pages; live: ${LIVE.map((r) => `${r.slug} (${COUNTS[r.slug]})`).join(', ') || 'none yet'}`);
 
 // Old addresses → new ones
 for (const [from, to] of Object.entries(redirects)) {
@@ -341,14 +407,14 @@ for (const [from, to] of Object.entries(redirects)) {
   writeFileSync(out, `<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex"><link rel="canonical" href="${site.url}${to}"><meta http-equiv="refresh" content="0; url=${rel}"><title>Moved</title><a href="${rel}">This page has moved</a>\n`);
 }
 
-// Region list for the staff page + site (single source of truth)
-writeFileSync(join(root, 'js/regions.js'), `// Generated by tools/build.mjs from data/regions.json. Don't edit by hand.\nexport const REGIONS = ${JSON.stringify(Object.fromEntries([...regions.map((r) => [r.slug, r.name.charAt(0).toUpperCase() + r.name.slice(1)]), ['elsewhere', 'Elsewhere in the UK']]), null, 2)};\nexport const TOWNS = ${JSON.stringify(Object.fromEntries(regions.map((r) => [r.slug, r.towns])))};\nexport const MATERIALS = ${JSON.stringify(MATERIALS.map(({ key, name, keywords }) => ({ key, name, keywords })))};\n`);
+// Region + material lists for the staff page and site (single source of truth)
+writeFileSync(join(root, 'js/regions.js'), `// Generated by tools/build.mjs from data/regions.json. Don't edit by hand.\nexport const REGIONS = ${JSON.stringify(Object.fromEntries([['scotland', 'Scotland'], ...regions.map((r) => [r.slug, cap(r.name)]), ['elsewhere', 'Elsewhere in the UK']]), null, 2)};\nexport const TOWNS = ${JSON.stringify(Object.fromEntries(regions.map((r) => [r.slug, r.towns])))};\nexport const MATERIALS = ${JSON.stringify(MATERIALS.map(({ key, name, keywords }) => ({ key, name, keywords })))};\n`);
 
-// sitemap + robots
+// Sitemap: the hub and live regions only
 const today = new Date().toISOString().slice(0, 10);
 writeFileSync(join(root, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${regions.map((r) => `  <url><loc>${site.url}${r.path}</loc><lastmod>${today}</lastmod></url>`).join('\n')}
+${[HUB, ...LIVE].map((r) => `  <url><loc>${site.url}${r.path}</loc></url>`).join('\n')}
 </urlset>
 `);
 writeFileSync(join(root, 'robots.txt'), site.noindex
