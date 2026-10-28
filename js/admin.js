@@ -149,7 +149,7 @@ async function refresh() {
   [JOBS, ENQ] = await Promise.all([
     sb.from('gs_jobs').select('*').order('created_at', { ascending: false }).then(must),
     sb.from('gs_enquiries').select('*').order('created_at', { ascending: false }).limit(300).then(must),
-  ]).catch((e) => { $('#j-error').textContent = 'Could not load: ' + e.message; $('#j-error').hidden = false; return [[], []]; });
+  ]).catch((e) => { $('#j-error').textContent = /schema cache|does not exist/.test(e.message) ? 'The database tables aren\'t set up yet: run supabase/001_jobs.sql in the Supabase SQL editor.' : 'Could not load: ' + e.message; $('#j-error').hidden = false; return [[], []]; });
   drawJobs(); drawEnq(); drawStaff();
 }
 $('#jobs-filter').onchange = drawJobs;
