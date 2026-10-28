@@ -1,40 +1,44 @@
-// Public landing pages: live jobs + reviews for this region, and the quote form.
+// Public landing pages: live jobs + reviews, material pop-ups, and the quote form.
 // Plain fetch() to Supabase's REST API so the public pages stay light (no client library).
-import { SUPABASE_URL, SUPABASE_ANON_KEY, SETTINGS, REGIONS } from './config.js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, SETTINGS } from './config.js';
+import { REGIONS, MATERIALS } from './regions.js';
 
 const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const REGION = document.body.dataset.region;
 const H = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
 const stars = (n) => (n ? '★'.repeat(n) + '☆'.repeat(5 - n) : '');
 
-document.querySelectorAll('[data-year]').forEach((e) => (e.textContent = new Date().getFullYear()));
+$$('[data-year]').forEach((e) => (e.textContent = new Date().getFullYear()));
 
 // ---------------- Jobs ----------------
 let ALL = [];
+function materialOf(j) {
+  if (j.material_type) return j.material_type;
+  const t = (j.material || '').toLowerCase();
+  return MATERIALS.find((m) => m.keywords.some((k) => t.includes(k)))?.key || null;
+}
+const jobTitle = (j) => j.title || [j.material, (j.job_type || 'worktops').toLowerCase()].filter(Boolean).join(' ');
+
 async function loadJobs() {
-  const box = $('#jobs');
-  box.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
   try {
-    const q = 'select=id,region,town,title,job_type,material,description,photos,review_text,reviewer_name,rating,featured,job_date,created_at'
-      + '&published=is.true&order=featured.desc,job_date.desc.nullslast,created_at.desc&limit=60';
+    const q = 'select=*&published=is.true&order=featured.desc,job_date.desc.nullslast,created_at.desc&limit=200';
     const r = await fetch(`${SUPABASE_URL}/rest/v1/gs_jobs?${q}`, { headers: H });
     if (!r.ok) throw new Error(r.status);
-    ALL = (await r.json()).filter((j) => j.photos?.length);
-  } catch (e) {
-    console.warn('Jobs not loaded', e);
-    ALL = [];
-  }
-  render();
+    ALL = (await r.json()).filter((j) => j.photos?.length).map((j) => ({ ...j, mat: materialOf(j) }));
+  } catch (e) { console.warn('Jobs not loaded', e); ALL = []; }
+  renderWork();
+  renderReviews();
+  renderMaterialJobs();
 }
 
-function jobTitle(j) {
-  return j.title || [j.material, (j.job_type || 'worktops').toLowerCase()].filter(Boolean).join(' ');
-}
-
-function card(j, i) {
+// Every card that opens the lightbox registers its job here.
+const SHOWN = [];
+function card(j) {
+  const i = SHOWN.push(j) - 1;
   const n = j.photos.length;
-  const where = [j.town, REGIONS[j.region] && j.region !== REGION ? REGIONS[j.region] : null].filter(Boolean).join(', ');
+  const where = [j.town, j.region !== REGION ? REGIONS[j.region] : null].filter(Boolean).join(', ');
   return `<article class="job">
     <button class="job-photo" type="button" data-job="${i}" aria-label="View ${n} photo${n > 1 ? 's' : ''}: ${esc(jobTitle(j))}">
       <img src="${esc(j.photos[0])}" alt="${esc(jobTitle(j))}${j.town ? ' in ' + esc(j.town) : ''}" loading="lazy">
@@ -49,34 +53,62 @@ function card(j, i) {
   </article>`;
 }
 
-let SHOWN = [];
-function render() {
+// The "Recent jobs" section only appears once there are real jobs to show, so a region
+// page never claims work it doesn't have.
+function renderWork() {
+  if (!ALL.length) return;
   const here = ALL.filter((j) => j.region === REGION);
-  let more = [];
-  if (here.length < SETTINGS.minJobsPerRegion) more = ALL.filter((j) => j.region !== REGION).slice(0, 6 - here.length);
-  SHOWN = [...here, ...more];
-  $('#jobs').innerHTML = here.map((j, i) => card(j, i)).join('');
-  $('#jobs-more').innerHTML = more.map((j, i) => card(j, here.length + i)).join('');
-  $('#more-head').hidden = !(here.length && more.length);
-  $('#showcase').hidden = SHOWN.length >= SETTINGS.hideShowcaseAt;
-  renderReviews(here);
+  const more = here.length < SETTINGS.minJobsPerRegion ? ALL.filter((j) => j.region !== REGION).slice(0, 6 - here.length) : [];
+  const name = REGIONS[REGION];
+  $('[data-work-title]').textContent = here.length ? `Recent jobs in ${name.replace(/^The /, 'the ')}` : 'Recent jobs across Scotland';
+  $('[data-work-sub]').textContent = here.length
+    ? 'Worktops we\'ve templated, made and fitted nearby, with what the customer said about them.'
+    : `No ${name.replace(/^The /, 'the ')} jobs on here yet, so here's some of our recent work elsewhere.`;
+  $('#jobs').innerHTML = (here.length ? here : more).map(card).join('');
+  if (here.length && more.length) { $('#more-head').hidden = false; $('#jobs-more').innerHTML = more.map(card).join(''); }
+  $('#work').hidden = false;
+  $$('[data-work-link]').forEach((a) => (a.hidden = false));
 }
 
 // Customer reviews attached to jobs go first (this region's, then elsewhere), then the
-// long-standing testimonials already in the page.
-function renderReviews(here) {
-  const withReview = [...here, ...ALL.filter((j) => j.region !== REGION)].filter((j) => j.review_text);
+// long-standing testimonials already in the page. At most 6.
+function renderReviews() {
+  const withReview = [...ALL.filter((j) => j.region === REGION), ...ALL.filter((j) => j.region !== REGION)].filter((j) => j.review_text);
   if (!withReview.length) return;
   const list = $('#review-list');
-  const html = withReview.slice(0, 6).map((j) => `<blockquote class="review">
+  list.insertAdjacentHTML('afterbegin', withReview.slice(0, 6).map((j) => `<blockquote class="review">
     ${j.rating ? `<div class="stars" aria-label="${j.rating} out of 5">${stars(j.rating)}</div>` : ''}
     <p>“${esc(j.review_text)}”</p>
     <cite>${esc(j.reviewer_name || 'Customer')}<span class="where">${esc([jobTitle(j), j.town].filter(Boolean).join(', '))}</span></cite>
-  </blockquote>`).join('');
-  list.insertAdjacentHTML('afterbegin', html);
-  // keep the grid tidy: at most 6 cards
+  </blockquote>`).join(''));
   [...list.children].slice(6).forEach((el) => el.remove());
 }
+
+// ---------------- Material pop-ups ----------------
+function renderMaterialJobs() {
+  for (const box of $$('[data-mat-jobs]')) {
+    const key = box.dataset.matJobs;
+    const jobs = [...ALL.filter((j) => j.mat === key && j.region === REGION), ...ALL.filter((j) => j.mat === key && j.region !== REGION)].slice(0, 12);
+    if (!jobs.length) continue;
+    box.innerHTML = jobs.map((j) => {
+      const i = SHOWN.push(j) - 1;
+      return `<button class="md-job" type="button" data-job="${i}"><img src="${esc(j.photos[0])}" alt="${esc(jobTitle(j))}" loading="lazy"><span>${esc([j.material, j.town].filter(Boolean).join(' · '))}</span></button>`;
+    }).join('');
+    const inspo = $(`[data-mat-inspo="${key}"]`); if (inspo) inspo.hidden = true;
+  }
+}
+document.addEventListener('click', (e) => {
+  const open = e.target.closest('[data-open-mat]');
+  if (open) { const d = $(`#mat-${open.dataset.openMat}`); d.showModal(); d.querySelector('.md-inner').scrollTop = 0; return; }
+  const close = e.target.closest('.mat-dialog [data-close]');
+  if (close) { close.closest('dialog').close(); return; }
+  const quote = e.target.closest('[data-quote-mat]');
+  if (quote) {
+    $('#q-mat').value = quote.dataset.quoteMat;
+    quote.closest('dialog').close();
+  }
+});
+$$('.mat-dialog').forEach((d) => d.addEventListener('click', (e) => { if (e.target === d) d.close(); }));
 
 // ---------------- Lightbox ----------------
 const lb = $('#lightbox');
@@ -123,16 +155,18 @@ form.addEventListener('submit', async (e) => {
   if (bad) { msg.className = 'form-msg err'; msg.textContent = 'Please fill in your name, phone, postcode and a valid email.'; bad.focus(); return; }
 
   const btn = $('button[type=submit]', form); btn.disabled = true; btn.textContent = 'Sending…';
+  const matName = MATERIALS.find((m) => m.key === f.material)?.name;
+  const message = [matName ? `Material: ${matName}` : null, f.message?.trim() || null].filter(Boolean).join('\n\n') || null;
   const row = {
     name: f.name.trim(), phone: f.phone.trim(), email: f.email.trim(), postcode: f.postcode.trim().toUpperCase(),
-    project_type: f.project_type, message: f.message?.trim() || null, region: REGION, page: location.pathname,
+    project_type: f.project_type, message, region: REGION, page: location.pathname,
   };
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/gs_enquiries`, {
       method: 'POST', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(row),
     });
     if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
-    // Email alert to the office. Never blocks the customer; the alert function retries unsent ones.
+    // Email alert to the office. Never blocks the customer; a daily job retries anything unsent.
     fetch(`${SUPABASE_URL}/functions/v1/gs-enquiry-alert`, { method: 'POST', headers: { ...H, 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {});
     form.classList.add('sent');
     msg.className = 'form-msg ok';

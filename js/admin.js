@@ -1,5 +1,6 @@
 // Staff page: add jobs (photos + area + optional review), manage jobs, read enquiries, approve staff.
-import { SUPABASE_URL, SUPABASE_ANON_KEY, REGIONS } from './config.js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
+import { REGIONS, TOWNS, MATERIALS } from './regions.js';
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -10,8 +11,6 @@ const must = ({ data, error }) => { if (error) throw new Error(error.message); r
 const uid = () => crypto.randomUUID();
 const when = (d) => new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
-let TOWNS = {};
-fetch('data/regions.json').then((r) => r.json()).then((d) => { d.regions.forEach((r) => (TOWNS[r.slug] = r.towns)); fillTowns(); }).catch(() => {});
 
 // ---------------- Auth ----------------
 let signUpMode = false, ME = null;
@@ -59,6 +58,10 @@ $$('[data-tab]').forEach((b) => (b.onclick = () => {
 const regionSel = $('#j-region');
 regionSel.innerHTML = Object.entries(REGIONS).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('');
 $('#jobs-filter').insertAdjacentHTML('beforeend', Object.entries(REGIONS).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join(''));
+const MAT_OPTS = [...MATERIALS, { key: 'quartz', name: 'Quartz (other brand)', keywords: ['quartz'] }, { key: 'other', name: 'Other', keywords: [] }];
+$('#j-mattype').innerHTML = '<option value="">Choose…</option>' + MAT_OPTS.map((m) => `<option value="${m.key}">${esc(m.name)}</option>`).join('');
+// Old jobs saved before material types existed: work the type out from the text.
+function guessType(text) { const t = (text || '').toLowerCase(); return MAT_OPTS.find((m) => m.keywords.some((k) => t.includes(k)))?.key || ''; }
 function fillTowns() { $('#towns').innerHTML = (TOWNS[regionSel.value] || []).map((t) => `<option>${esc(t)}</option>`).join(''); }
 regionSel.onchange = () => { fillTowns(); try { localStorage.setItem('gs-last-region', regionSel.value); } catch {} };
 
@@ -116,6 +119,7 @@ $('#job-form').onsubmit = async (e) => {
   const review = $('#j-review').value.trim();
   try {
     if (!PHOTOS.length) throw new Error('Add at least one photo.');
+    if (!$('#j-mattype').value) throw new Error('Choose the material so the job shows under the right material on the website.');
     if (review && !$('#j-consent').checked) throw new Error('Tick the box to confirm the customer is happy for their review to be shown, or clear the review.');
     const btn = $('#j-save'); btn.disabled = true;
     const urls = [];
@@ -126,7 +130,9 @@ $('#job-form').onsubmit = async (e) => {
     btn.textContent = 'Saving…';
     const row = {
       region: regionSel.value, town: $('#j-town').value.trim() || null, job_type: $('#j-type').value,
-      material: $('#j-material').value.trim() || null, title: $('#j-title').value.trim() || null,
+      material_type: $('#j-mattype').value || null,
+      material: [MAT_OPTS.find((m) => m.key === $('#j-mattype').value && !['other'].includes(m.key))?.name.replace(' (other brand)', ''), $('#j-colour').value.trim()].filter(Boolean).join(' ') || null,
+      title: $('#j-title').value.trim() || null,
       description: $('#j-desc').value.trim() || null, photos: urls,
       review_text: review || null, reviewer_name: review ? ($('#j-reviewer').value.trim() || null) : null,
       rating: review && RATING ? RATING : null,
@@ -179,7 +185,9 @@ function editJob(id) {
   const j = JOBS.find((x) => x.id === id); if (!j) return;
   resetForm();
   $('#j-id').value = j.id; regionSel.value = j.region; fillTowns();
-  $('#j-town').value = j.town || ''; $('#j-type').value = j.job_type || 'Other'; $('#j-material').value = j.material || '';
+  $('#j-town').value = j.town || ''; $('#j-type').value = j.job_type || 'Other'; const mt = j.material_type || guessType(j.material); $('#j-mattype').value = mt;
+  const mName = MAT_OPTS.find((m) => m.key === mt)?.name.replace(' (other brand)', '') || '';
+  $('#j-colour').value = (j.material || '').startsWith(mName) ? (j.material || '').slice(mName.length).trim() : (j.material || '');
   $('#j-title').value = j.title || ''; $('#j-desc').value = j.description || ''; $('#j-date').value = j.job_date || '';
   $('#j-review').value = j.review_text || ''; $('#j-reviewer').value = j.reviewer_name || ''; $('#j-consent').checked = !!j.review_text;
   RATING = j.rating || 0; drawRating();
