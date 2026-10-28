@@ -7,6 +7,8 @@ const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const REGION = document.body.dataset.region;
+const HUB = REGION === 'scotland';
+const inRegion = (j) => HUB || j.region === REGION;
 const H = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
 const stars = (n) => (n ? '★'.repeat(n) + '☆'.repeat(5 - n) : '');
 
@@ -27,20 +29,20 @@ async function loadJobs() {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/gs_jobs?${q}`, { headers: H });
     if (!r.ok) throw new Error(r.status);
     ALL = (await r.json()).filter((j) => j.photos?.length).map((j) => ({ ...j, mat: materialOf(j) }));
-  } catch (e) { console.warn('Jobs not loaded', e); ALL = []; }
+  } catch (e) { console.warn('Jobs not loaded', e); return; } // keep whatever was built into the page
+  ALL.forEach((j) => (BY_ID[j.id] = j));
   renderWork();
   renderReviews();
   renderMaterialJobs();
 }
 
-// Every card that opens the lightbox registers its job here.
-const SHOWN = [];
+// Cards (including ones written into the page at build time) open the lightbox by job id.
+const BY_ID = {};
 function card(j) {
-  const i = SHOWN.push(j) - 1;
   const n = j.photos.length;
-  const where = [j.town, j.region !== REGION ? REGIONS[j.region] : null].filter(Boolean).join(', ');
+  const where = [j.town, REGIONS[j.region]].filter(Boolean).join(', ');
   return `<article class="job">
-    <button class="job-photo" type="button" data-job="${i}" aria-label="View ${n} photo${n > 1 ? 's' : ''}: ${esc(jobTitle(j))}">
+    <button class="job-photo" type="button" data-job="${esc(j.id)}" aria-label="View ${n} photo${n > 1 ? 's' : ''}: ${esc(jobTitle(j))}">
       <img src="${esc(j.photos[0])}" alt="${esc(jobTitle(j))}${j.town ? ' in ' + esc(j.town) : ''}" loading="lazy">
       ${n > 1 ? `<span class="count">${n} photos</span>` : ''}
     </button>
@@ -57,15 +59,16 @@ function card(j) {
 // page never claims work it doesn't have.
 function renderWork() {
   if (!ALL.length) return;
-  const here = ALL.filter((j) => j.region === REGION);
-  const more = here.length < SETTINGS.minJobsPerRegion ? ALL.filter((j) => j.region !== REGION).slice(0, 6 - here.length) : [];
+  const here = HUB ? ALL.slice(0, 9) : ALL.filter(inRegion);
+  const more = !HUB && here.length < SETTINGS.minJobsPerRegion ? ALL.filter((j) => !inRegion(j)).slice(0, 6 - here.length) : [];
   const name = REGIONS[REGION];
-  $('[data-work-title]').textContent = here.length ? `Recent jobs in ${name.replace(/^The /, 'the ')}` : 'Recent jobs across Scotland';
+  $('[data-work-title]').textContent = HUB ? 'Recent jobs across Scotland' : here.length ? `Recent jobs in ${name.replace(/^The /, 'the ')}` : 'Recent jobs across Scotland';
   $('[data-work-sub]').textContent = here.length
     ? 'Worktops we\'ve templated, made and fitted nearby, with what the customer said about them.'
     : `No ${name.replace(/^The /, 'the ')} jobs on here yet, so here's some of our recent work elsewhere.`;
   $('#jobs').innerHTML = (here.length ? here : more).map(card).join('');
-  if (here.length && more.length) { $('#more-head').hidden = false; $('#jobs-more').innerHTML = more.map(card).join(''); }
+  $('#more-head').hidden = !(here.length && more.length);
+  $('#jobs-more').innerHTML = here.length && more.length ? more.map(card).join('') : '';
   $('#work').hidden = false;
   $$('[data-work-link]').forEach((a) => (a.hidden = false));
 }
@@ -73,7 +76,7 @@ function renderWork() {
 // Customer reviews attached to jobs go first (this region's, then elsewhere), then the
 // long-standing testimonials already in the page. At most 6.
 function renderReviews() {
-  const withReview = [...ALL.filter((j) => j.region === REGION), ...ALL.filter((j) => j.region !== REGION)].filter((j) => j.review_text);
+  const withReview = [...ALL.filter(inRegion), ...ALL.filter((j) => !inRegion(j))].filter((j) => j.review_text);
   if (!withReview.length) return;
   const list = $('#review-list');
   list.insertAdjacentHTML('afterbegin', withReview.slice(0, 6).map((j) => `<blockquote class="review">
@@ -88,11 +91,10 @@ function renderReviews() {
 function renderMaterialJobs() {
   for (const box of $$('[data-mat-jobs]')) {
     const key = box.dataset.matJobs;
-    const jobs = [...ALL.filter((j) => j.mat === key && j.region === REGION), ...ALL.filter((j) => j.mat === key && j.region !== REGION)].slice(0, 12);
+    const jobs = [...ALL.filter((j) => j.mat === key && inRegion(j)), ...ALL.filter((j) => j.mat === key && !inRegion(j))].slice(0, 12);
     if (!jobs.length) continue;
     box.innerHTML = jobs.map((j) => {
-      const i = SHOWN.push(j) - 1;
-      return `<button class="md-job" type="button" data-job="${i}"><img src="${esc(j.photos[0])}" alt="${esc(jobTitle(j))}" loading="lazy"><span>${esc([j.material, j.town].filter(Boolean).join(' · '))}</span></button>`;
+      return `<button class="md-job" type="button" data-job="${esc(j.id)}"><img src="${esc(j.photos[0])}" alt="${esc(jobTitle(j))}" loading="lazy"><span>${esc([j.material, j.town].filter(Boolean).join(' · '))}</span></button>`;
     }).join('');
     const inspo = $(`[data-mat-inspo="${key}"]`); if (inspo) inspo.hidden = true;
   }
@@ -123,7 +125,8 @@ function show() {
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-job]');
   if (!b) return;
-  cur = { job: SHOWN[+b.dataset.job], i: 0 }; show(); lb.showModal();
+  const job = BY_ID[b.dataset.job]; if (!job) return;
+  cur = { job, i: 0 }; show(); lb.showModal();
 });
 $('.lb-close', lb).onclick = () => lb.close();
 $('.lb-prev', lb).onclick = () => { cur.i = (cur.i - 1 + cur.job.photos.length) % cur.job.photos.length; show(); };
@@ -184,3 +187,8 @@ form.addEventListener('submit', async (e) => {
 });
 
 loadJobs();
+
+// Close the Areas menu when tapping elsewhere or choosing an option.
+document.addEventListener('click', (e) => {
+  $$('details.nav-areas[open]').forEach((d) => { if (!d.contains(e.target) || e.target.closest('a')) d.open = false; });
+});

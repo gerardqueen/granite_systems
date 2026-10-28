@@ -56,8 +56,8 @@ $$('[data-tab]').forEach((b) => (b.onclick = () => {
 
 // ---------------- Job form ----------------
 const regionSel = $('#j-region');
-regionSel.innerHTML = Object.entries(REGIONS).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('');
-$('#jobs-filter').insertAdjacentHTML('beforeend', Object.entries(REGIONS).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join(''));
+regionSel.innerHTML = Object.entries(REGIONS).filter(([k]) => k !== 'scotland').map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('');
+$('#jobs-filter').insertAdjacentHTML('beforeend', Object.entries(REGIONS).filter(([k]) => k !== 'scotland').map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join(''));
 const MAT_OPTS = [...MATERIALS, { key: 'quartz', name: 'Quartz (other brand)', keywords: ['quartz'] }, { key: 'other', name: 'Other', keywords: [] }];
 $('#j-mattype').innerHTML = '<option value="">Choose…</option>' + MAT_OPTS.map((m) => `<option value="${m.key}">${esc(m.name)}</option>`).join('');
 // Old jobs saved before material types existed: work the type out from the text.
@@ -142,7 +142,7 @@ $('#job-form').onsubmit = async (e) => {
     const id = $('#j-id').value;
     if (id) must(await sb.from('gs_jobs').update(row).eq('id', id));
     else must(await sb.from('gs_jobs').insert(row));
-    ok.textContent = id ? 'Job updated.' : `Saved. It's now on the ${REGIONS[row.region]} page.`;
+    ok.textContent = id ? 'Job updated.' : `Saved. It's live on the website now. If it's the first job for ${REGIONS[row.region]}, that area's page switches on at the next site refresh (within 2 hours).`;
     ok.hidden = false;
     resetForm(); refresh();
   } catch (ex) { err.textContent = ex.message; err.hidden = false; }
