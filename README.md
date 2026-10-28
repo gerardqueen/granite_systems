@@ -1,10 +1,11 @@
 # Granite Systems: regional landing pages
 
-A single-purpose landing page for Granite Systems (Kirkcaldy), built to turn visits into quote requests. There's one version per region:
+A single-purpose landing page for Granite Systems (Kirkcaldy), built to turn visits into quote requests. The homepage covers all of Scotland, and each region has its own page:
 
 | Page | Path |
 |---|---|
-| Fife (home) | `/` |
+| All of Scotland (home) | `/` |
+| Fife | `/fife/` |
 | Edinburgh & the Lothians | `/edinburgh/` |
 | Dundee & Angus | `/dundee-angus/` |
 | Perth & Kinross | `/perth-kinross/` |
@@ -40,6 +41,12 @@ Quote requests appear under **Enquiries** in the staff page, and are emailed to 
 1. **Database**: Supabase → SQL Editor → run `supabase/001_jobs.sql`, then `supabase/002_scotland_regions.sql`. This creates `gs_jobs`, `gs_enquiries` and the `gs-job-photos` bucket, and reuses `admins` / `is_admin()` from Second Cut Stone.
 2. **Email alerts**: Supabase → Edge Functions → Deploy new function → name it `gs-enquiry-alert` → paste `supabase/functions/gs-enquiry-alert/index.ts`. It uses the `RESEND_API_KEY` / `ALERT_TO` secrets that are already set. Add `GS_ALERT_TO` if these should go to a different inbox.
 3. **GitHub Pages**: Settings → Pages → Deploy from branch → `main` / root.
+
+## When a region page goes live
+
+A region page only switches on once it has a published job (`site.activateAt` in `data/regions.json`). Until then it isn't in the Areas menu or the sitemap and is marked `noindex`, so Google never sees 14 near-identical pages (the "doorway page" problem). Once live, its jobs, towns and reviews are written into the page itself, so search engines see real local content.
+
+The **Build region pages** action checks for new jobs every 2 hours and switches regions on automatically. To do it straight away: Actions → Build region pages → Run workflow.
 
 ## Changing regions, materials or wording
 
