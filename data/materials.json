@@ -1,0 +1,98 @@
+[
+  {
+    "key": "silestone",
+    "name": "Silestone",
+    "kind": "Quartz by Cosentino",
+    "line": "Our most popular surface: non-porous quartz in over 90 colours.",
+    "desc": "Silestone is an engineered quartz surface made by Cosentino in Spain, and it's what most of our customers choose. It's non-porous, so coffee, wine, oil and lemon juice wipe straight off, and with quartz second only to diamond in hardness it stands up to everyday knocks and scratches.",
+    "facts": ["Over 90 colours in polished, suede and volcano textures", "Non-porous, so no sealing needed", "25-year manufacturer's warranty"],
+    "card": "img/silestone.jpg",
+    "texture": "img/materials/mat-silestone.jpg",
+    "inspiration": ["img/silestone.jpg"],
+    "swatches": [
+      ["Charcoal Soapstone", "sw-silestone-charcoal-soapstone"], ["Negro Stellar", "sw-silestone-negro-stellar"], ["Marengo", "sw-silestone-marengo"],
+      ["Blanco Maple", "sw-silestone-blanco-maple"], ["Eternal Serena", "sw-silestone-eternal-serena"], ["Lyra", "sw-silestone-lyra"]
+    ],
+    "keywords": ["silestone"]
+  },
+  {
+    "key": "sensa",
+    "name": "Sensa Granite",
+    "kind": "Natural granite by Cosentino",
+    "line": "Natural granite, factory-sealed for extra stain resistance.",
+    "desc": "Sensa is a select range of natural granites and quartzites chosen by Cosentino for their looks and performance. Every slab is factory-treated with a penetrating sealer, so you get the character of natural stone with far better stain resistance than untreated granite.",
+    "facts": ["Polished, brushed or suede finishes", "Factory-sealed against stains", "Natural stone, so every slab is unique"],
+    "card": "img/sensa-granite.jpg",
+    "texture": "img/materials/mat-sensa.jpg",
+    "inspiration": ["img/sensa-granite.jpg"],
+    "swatches": [
+      ["Black Beauty", "sw-sensa-black-beauty"], ["Bianco Antico", "sw-sensa-bianco-antico"], ["Ice Blue", "sw-sensa-ice-blue"],
+      ["Glacial Blue", "sw-sensa-glacial-blue"], ["Indian Black", "sw-sensa-indian-black"], ["Moak Black", "sw-sensa-moak-black"]
+    ],
+    "keywords": ["sensa"]
+  },
+  {
+    "key": "granite",
+    "name": "Granite",
+    "kind": "Natural stone",
+    "line": "Timeless, hard-wearing natural stone in endless colours.",
+    "desc": "Craftsmen have used granite for thousands of years for its beauty and durability, and it suits traditional and contemporary kitchens alike. It comes from quarries all over the world, so the colour range is huge, and large-format slabs mean fewer joins on long runs and islands.",
+    "facts": ["Highly resistant to impact and scratching", "Polished, honed and leather finishes", "Low porosity and factory sealed"],
+    "card": "img/granite-black-kitchen.jpg",
+    "texture": "img/materials/mat-granite.jpg",
+    "inspiration": ["img/granite-black-kitchen.jpg", "img/granite-slab.jpg"],
+    "swatches": [
+      ["Angolan Black", "sw-granite-angolan-black"], ["Antique Brown", "sw-granite-antique-brown"], ["Bianco Sardo", "sw-granite-bianco-sardo"],
+      ["Golden Marinace", "sw-granite-golden-marinace"], ["Titanium", "sw-granite-titanium"], ["Emerald Pearl", "sw-granite-emerald-pearl"]
+    ],
+    "keywords": ["granite"]
+  },
+  {
+    "key": "dekton",
+    "name": "Dekton",
+    "kind": "Ultra-compact surface by Cosentino",
+    "line": "The toughest surface we work with, indoors or out.",
+    "desc": "Dekton is made by fusing minerals under extreme heat and pressure, much as natural stone forms over thousands of years. It contains no resins, so bleach, oven cleaner and drain cleaner won't mark it, and it's more scratch-resistant than granite, which makes it ideal for outdoor kitchens and busy commercial spaces.",
+    "facts": ["Suitable for outdoor kitchens", "More scratch-resistant than granite", "Unaffected by household chemicals"],
+    "card": "img/materials/dekton.jpg",
+    "texture": "img/materials/mat-dekton.jpg",
+    "inspiration": ["img/materials/dekton.jpg"],
+    "swatches": [
+      ["Trillium", "sw-dekton-trillium"], ["Aura", "sw-dekton-aura"], ["Keon", "sw-dekton-keon"],
+      ["Kelya", "sw-dekton-kelya"], ["Spectra", "sw-dekton-spectra"], ["Gada", "sw-dekton-gada"]
+    ],
+    "keywords": ["dekton"]
+  },
+  {
+    "key": "marble",
+    "name": "Marble",
+    "kind": "Natural stone",
+    "line": "Beautiful natural veining, at its best in bathrooms.",
+    "desc": "Marble has been prized for millennia, and no two pieces are the same. It's softer and more porous than granite or quartz, so it gains a lived-in patina over time, which is why we often recommend it for bathrooms, fireplaces and feature pieces rather than busy kitchens.",
+    "facts": ["Polished or honed finish", "Ideal for vanities, hearths and feature pieces", "Every installation is unique"],
+    "card": "img/marble-edge.jpg",
+    "texture": "img/materials/mat-marble.jpg",
+    "inspiration": ["img/marble-edge.jpg", "img/marble-black-vanity.jpg"],
+    "swatches": [
+      ["Nero Marquina", "sw-marble-nero-marquina"], ["Carrara", "sw-marble-carrara"], ["Arabescato Vagli", "sw-marble-arabescato-vagli"],
+      ["Emperador Dark", "sw-marble-emperador-dark"], ["Rojo Alicante", "sw-marble-rojo-alicante"], ["Crema Marfil", "sw-marble-crema-marfil"]
+    ],
+    "keywords": ["marble"]
+  },
+  {
+    "key": "corian",
+    "name": "Corian",
+    "kind": "Solid surface",
+    "line": "Invisible joins and smooth curves, in one continuous surface.",
+    "desc": "Corian is a blend of natural minerals and acrylic that can be joined invisibly and heat-formed into curves, so worktops and upstands flow as one surface. It's non-porous and resists most chemicals, and unlike stone, everyday marks can be repaired.",
+    "facts": ["Invisible joins and thermoformed curves", "Non-porous and hygienic", "Repairable surface"],
+    "card": "img/materials/corian-kitchen.jpg",
+    "texture": "img/materials/mat-corian.jpg",
+    "inspiration": ["img/materials/corian-kitchen.jpg", "img/corian-grey-kitchen.jpg", "img/video-bg.jpg"],
+    "swatches": [
+      ["Cameo White", "sw-corian-cameo-white"], ["Juniper", "sw-corian-juniper"], ["Platinum", "sw-corian-platinum"],
+      ["Basalt Terrazzo", "sw-corian-basalt-terrazzo"], ["Sandalwood", "sw-corian-sandalwood"], ["Grey Onyx", "sw-corian-grey-onyx"]
+    ],
+    "keywords": ["corian"]
+  }
+]
