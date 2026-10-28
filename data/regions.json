@@ -2,12 +2,13 @@
   "site": {
     "url": "https://gerardqueen.github.io/granite_systems/",
     "noindex": true,
-    "name": "Granite Systems"
+    "name": "Granite Systems",
+    "activateAt": 1
   },
   "regions": [
     {
       "slug": "fife",
-      "path": "",
+      "path": "fife/",
       "name": "Fife",
       "short": "Fife",
       "title": "Granite & Quartz Worktops in Fife | Granite Systems, Kirkcaldy",
@@ -23,7 +24,7 @@
         "Newport-on-Tay"
       ],
       "local": "Our workshop is on the Randolph Industrial Estate in Kirkcaldy, so wherever you are in Fife, from Dunfermline to St Andrews, we're never far away. You're welcome to come in and look through the range before you choose, and if you only need something small, ask about offcuts for hearths, tabletops and vanity tops.",
-      "hero": "img/hero-marble-island.jpg"
+      "hero": "img/kitchen-white-marble.jpg"
     },
     {
       "slug": "edinburgh",
@@ -266,7 +267,7 @@
         "Ullapool"
       ],
       "local": "From Inverness and the Moray coast to Aviemore and Fort William, Highland projects are often new builds, renovations and holiday lodges where durability matters as much as looks. We schedule visits around your build programme. If you're on one of the islands, just ask.",
-      "hero": "img/kitchen-white-marble.jpg"
+      "hero": "img/granite-slab.jpg"
     },
     {
       "slug": "argyll",
@@ -290,5 +291,17 @@
   ],
   "redirects": {
     "dundee-perth/": "dundee-angus/"
+  },
+  "hub": {
+    "slug": "scotland",
+    "path": "",
+    "name": "Scotland",
+    "short": "Scotland",
+    "title": "Granite & Quartz Worktops across Scotland | Granite Systems",
+    "description": "Granite, quartz, Dekton, marble and Corian worktops for kitchens, bathrooms and bars across Scotland. Templated, made in Fife and fitted by our own team. Free quotes.",
+    "h1": "Granite &amp; Quartz Worktops across Scotland",
+    "lede": "Kitchen worktops, islands, vanity tops and bar tops for homes and businesses across Scotland, from Fife and Edinburgh to Glasgow, Aberdeen and the Highlands.",
+    "local": "We're a Fife stone business working right across Scotland, for homeowners, kitchen studios, builders, hotels and restaurants. Wherever you are, the job is handled the same way, by the same team, from first measure to final fit. If your town isn't listed, we still cover it: just ask.",
+    "hero": "img/hero-marble-island.jpg"
   }
 }
