@@ -1,0 +1,9 @@
+{
+  "name": "Granite Systems staff",
+  "short_name": "GS Jobs",
+  "start_url": "admin.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1e2843",
+  "icons": [{ "src": "img/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
